@@ -259,8 +259,8 @@ function Get-Tools {
 # Publish for targets
 function Build {
     # Clean anything in existing Release directory.
-    Remove-Item $publishBuildDirectory -Recurse -ErrorAction SilentlyContinue
-    New-Item $publishBuildDirectory -ItemType Directory -ErrorAction SilentlyContinue
+    #Remove-Item $publishBuildDirectory -Recurse -ErrorAction SilentlyContinue
+    #New-Item $publishBuildDirectory -ItemType Directory -ErrorAction SilentlyContinue
 
     # Build
     dotnet restore $ProjectPath
@@ -363,7 +363,7 @@ function Cleanup {
     Remove-Item $PublishOutputDir -Recurse -ErrorAction SilentlyContinue
     Remove-Item $PublishNuGetDirectory -Recurse -ErrorAction SilentlyContinue
     Remove-Item $PublishGenericDirectory -Recurse -ErrorAction SilentlyContinue
-    Remove-Item $publishBuildDirectory -Recurse -ErrorAction SilentlyContinue
+    #Remove-Item $publishBuildDirectory -Recurse -ErrorAction SilentlyContinue
     Remove-Item $deltaDirectory -Recurse -ErrorAction SilentlyContinue
 }
 

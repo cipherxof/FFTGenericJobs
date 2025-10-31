@@ -304,7 +304,7 @@ namespace GenericJobs
 
         private byte Sub363718Hook()
         {
-            if (_jobMenuState == 1402)
+            if (_pageOffset > 0 && (_jobMenuState == 1402 || _jobMenuState == 1404))
                 return 0;
 
             byte result = _sub363718Hook!.OriginalFunction();
