@@ -52,6 +52,7 @@ namespace GenericJobs
         private IHook<SetJobRequirementNameDelegate>? _setJobRequirementName;
         private IHook<HandleJobMenuClickDelegate>? _handleJobMenuClick;
         private IHook<HandleJobMenuStateDelegate>? _handleJobMenuState;
+        private IHook<Sub286634Delegate>? _sub286634;
 
         // Patched addresses
         private nuint _jobPatch1 = 0;
@@ -96,6 +97,9 @@ namespace GenericJobs
 
         [Function(CallingConventions.Microsoft)]
         private delegate void HandleJobMenuStateDelegate(nint a1, nint a2, uint a3, short a4, int a5);
+
+        [Function(CallingConventions.Microsoft)]
+        private delegate nint Sub286634Delegate(short a1, ushort jobId, int a3, nint a4, int a5);
 
         // Wrapper for original functions
         private Sub1309C0Delegate? _sub1309C0;
@@ -264,7 +268,15 @@ namespace GenericJobs
                 ["DK_AbyssalBlade"] = (
                     "E8 00 E9 00 EA 00",
                     e => WriteMemory(_gameBase + (nuint)e.Offset, [0x62, 0x00])
-                )
+                ),
+                ["DK_RSMFixup1"] = (
+                    "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 8B 74 24",
+                    e => _sub286634 = _hooks.CreateHook<Sub286634Delegate>(Sub286634Hook, (long)_gameBase + e.Offset).Activate()
+                ),
+                ["DK_RSMFixup2"] = (
+                    "83 FB ?? 7C ?? BB",
+                    e => WriteMemory(_gameBase + (nuint)e.Offset, [0x83, 0xFB, 0x15])
+                ),
             };
 
             if (_extraJobs.Contains((ushort)0xA0))
@@ -537,6 +549,14 @@ namespace GenericJobs
             {
                 Marshal.Copy(_jobMenuPageOneData, 0, IntPtr.Add(_jobMenuUI, 8816), 0xB00);
             }
+        }
+
+        private nint Sub286634Hook(short a1, ushort jobId, int a3, nint a4, int a5)
+        {
+            if (jobId == 0x5E)
+                jobId = 0xA0;
+
+            return _sub286634.OriginalFunction(a1, jobId, a3, a4, a5);
         }
 
         #region Standard Overrides
