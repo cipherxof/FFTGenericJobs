@@ -414,6 +414,26 @@ namespace GenericJobs
             }
         }
 
+        private unsafe void SetPageData(nint a1, nint a2, int pageOffet, int newIndex)
+        {
+            ApplyTempPatches(true);
+            _pageOffset = pageOffet;
+            UpdateJobListDisplay();
+
+            *(int*)(a1 + 0x4A38) = newIndex;
+
+            _dontReset = true;
+            _sub363718Hook!.OriginalFunction();
+            _dontReset = false;
+
+            _sub1309C0!(a1, newIndex, 0);
+            *(int*)(a1 + 0x4A38) = newIndex;
+            *(int*)(a2 + 4) = newIndex;
+            *(byte*)(a2 + 8) = 1;
+
+            ApplyTempPatches(false);
+        }
+
         private unsafe void Sub12FBB8Hook(nint a1, nint a2, int a3, int a4)
         {
             int currentIndex = *(int*)(a1 + 0x4A38);
@@ -435,49 +455,12 @@ namespace GenericJobs
                 if (_pageOffset == 0 && _extraJobs.Length > 0)
                 {
                     Marshal.Copy(IntPtr.Add(a1, 8816), _jobMenuPageOneData, 0, 0xB00);
-
-                    // Go to page 2
-                    ApplyTempPatches(true);
-                    _pageOffset = 1;
-                    //_logger.WriteLine($"[{_modConfig.ModId}] PAGE DOWN - Scrolling to page 2 (was {currentIndex}, would be {newIndex})");
-
-                    UpdateJobListDisplay();
-
-                    *(int*)(a1 + 0x4A38) = newIndex;
-
-                    _dontReset = true;
-                    _sub363718Hook!.OriginalFunction();
-                    _dontReset = false;
-
-                    _sub1309C0!(a1, newIndex, 0);
-                    *(int*)(a1 + 0x4A38) = newIndex;
-                    *(int*)(a2 + 4) = newIndex;
-                    *(byte*)(a2 + 8) = 1;
-
-                    ApplyTempPatches(false);
+                    SetPageData(a1, a2, 1, newIndex);
                     return;
                 }
                 else if (_pageOffset == 1)
                 {
-                    // Wrap back to page 1
-                    ApplyTempPatches(true);
-                    _pageOffset = 0;
-                    //_logger.WriteLine($"[{_modConfig.ModId}] PAGE WRAP - Scrolling back to page 1 (was {currentIndex}, would be {newIndex})");
-
-                    UpdateJobListDisplay();
-
-                    *(int*)(a1 + 0x4A38) = newIndex;
-
-                    _dontReset = true;
-                    _sub363718Hook!.OriginalFunction();
-                    _dontReset = false;
-
-                    _sub1309C0!(a1, newIndex, 0);
-                    *(int*)(a1 + 0x4A38) = newIndex;
-                    *(int*)(a2 + 4) = newIndex;
-                    *(byte*)(a2 + 8) = 1;
-
-                    ApplyTempPatches(false);
+                    SetPageData(a1, a2, 0, newIndex);
                     return;
                 }
             }
@@ -487,48 +470,13 @@ namespace GenericJobs
             {
                 if (_pageOffset == 1)
                 {
-                    // Go back to page 1
-                    ApplyTempPatches(true);
-                    _pageOffset = 0;
-                    UpdateJobListDisplay();
-
-                    *(int*)(a1 + 0x4A38) = newIndex;
-
-                    _dontReset = true;
-                    _sub363718Hook!.OriginalFunction();
-                    _dontReset = false;
-
-                    _sub1309C0!(a1, newIndex, 0);
-                    *(int*)(a1 + 0x4A38) = newIndex;
-                    *(int*)(a2 + 4) = newIndex;
-                    *(byte*)(a2 + 8) = 1;
-
-                    ApplyTempPatches(false);
+                    SetPageData(a1, a2, 0, newIndex);
                     return;
                 }
                 else if (_pageOffset == 0 && _extraJobs.Length > 0)
                 {
                     Marshal.Copy(IntPtr.Add(a1, 8816), _jobMenuPageOneData, 0, 0xB00);
-
-                    // Wrap to page 2 (last page)
-                    ApplyTempPatches(true);
-                    _pageOffset = 1;
-                    _logger.WriteLine($"[{_modConfig.ModId}] PAGE WRAP UP - Scrolling to page 2 (was {currentIndex}, would be {newIndex})");
-
-                    UpdateJobListDisplay();
-
-                    *(int*)(a1 + 0x4A38) = newIndex;
-
-                    _dontReset = true;
-                    _sub363718Hook!.OriginalFunction();
-                    _dontReset = false;
-
-                    _sub1309C0!(a1, newIndex, 0);
-                    *(int*)(a1 + 0x4A38) = newIndex;
-                    *(int*)(a2 + 4) = newIndex;
-                    *(byte*)(a2 + 8) = 1;
-
-                    ApplyTempPatches(false);
+                    SetPageData(a1, a2, 1, newIndex);
                     return;
                 }
             }
