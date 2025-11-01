@@ -248,7 +248,7 @@ namespace GenericJobs
                     e => WriteMemory(_gameBase + (nuint)(e.Offset - 7), [0x41, 0xBF, 0x15, 0x00, 0x00, 0x00, 0x90])
                 ),
                 ["JobIconPatch"] = (
-                    "83 F8 ?? 76 ?? 33 D2",
+                    "76 ?? 33 D2 41 B8 ?? ?? ?? ?? 48 8B CB",
                     e => WriteMemory(_gameBase + (nuint)e.Offset, [0xEB, 0x02])
                 )
             };
@@ -559,6 +559,8 @@ namespace GenericJobs
 
         private nint Sub286634Hook(short a1, ushort jobId, int a3, nint a4, int a5)
         {
+            // in order to equip dark knight reaction/support, we needed to +1 a > 19 loop
+            // which ended at 0x5E
             if (jobId == 0x5E)
                 jobId = 0xA0;
 
