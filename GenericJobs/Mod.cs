@@ -43,6 +43,7 @@ namespace GenericJobs
         private byte[] _jobMenuUIData = new byte[0xB00];
         private byte[] _jobMenuPageOneData = new byte[0xB00];
         private int _jobMenuState = 0;
+        private bool _isUltimaTeleporting = false;
 
         // Hook objects
         private IHook<Sub363718Delegate>? _sub363718Hook;
@@ -53,6 +54,9 @@ namespace GenericJobs
         private IHook<HandleJobMenuClickDelegate>? _handleJobMenuClick;
         private IHook<HandleJobMenuStateDelegate>? _handleJobMenuState;
         private IHook<Sub286634Delegate>? _sub286634;
+        private IHook<StartEffectDelegate>? _startEffect;
+        private IHook<HandleTeleportAnimationDelegate>? _handleTeleportAnimation;
+
 
         // Patched addresses
         private nuint _jobPatch1 = 0;
@@ -100,6 +104,12 @@ namespace GenericJobs
 
         [Function(CallingConventions.Microsoft)]
         private delegate nint Sub286634Delegate(short a1, ushort jobId, int a3, nint a4, int a5);
+
+        [Function(CallingConventions.Microsoft)]
+        private delegate nint StartEffectDelegate(nint a1, nint a2, nint a3);
+
+        [Function(CallingConventions.Microsoft)]
+        private delegate nint HandleTeleportAnimationDelegate(nint a1);
 
         // Wrapper for original functions
         private Sub1309C0Delegate? _sub1309C0;
@@ -246,28 +256,12 @@ namespace GenericJobs
                     e => WriteMemory(_gameBase + (nuint)e.Offset, [0x07, 0x00, 0x00])
                 ),
                 ["DK_SanguineSword2"] = (
-                    "A1 00 20 01 21 01",
-                    e => WriteMemory(_gameBase + (nuint)e.Offset, [0xAD, 0x00])
-                ),
-                ["DK_SanguineSword3"] = (
                     "F4 01 32 41 82 00 02 A0",
                     e => WriteMemory(_gameBase + (nuint)e.Offset, [0xF4, 0x01, 0x32, 0x41, 0x82, 0x00, 0x02, 0xA0])
                 ),
-                ["DK_SanguineSword4"] = (
+                ["DK_SanguineSword3"] = (
                     "01 00 03 09 10 10 00 00 3C 00 00 00 00 00 00 00 FF FF FF FF 04",
                     e => WriteMemory(_gameBase + (nuint)e.Offset, [0x03, 0x00, 0x00, 0x05, 0x11, 0x12, 0x08, 0x01, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-                ),
-                ["DK_InfernalStrike"] = (
-                    "C0 00 C1 00 C2 00 C3 00",
-                    e => WriteMemory(_gameBase + (nuint)e.Offset, [0xAC, 0x00])
-                ),
-                ["DK_CrushingBlow"] = (
-                    "E7 00 E8 00 E9 00",
-                    e => WriteMemory(_gameBase + (nuint)e.Offset, [0xF6, 0x00])
-                ),
-                ["DK_AbyssalBlade"] = (
-                    "E8 00 E9 00 EA 00",
-                    e => WriteMemory(_gameBase + (nuint)e.Offset, [0x62, 0x00])
                 ),
                 ["DK_RSMFixup1"] = (
                     "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 8B 74 24",
@@ -277,6 +271,14 @@ namespace GenericJobs
                     "83 FB ?? 7C ?? BB",
                     e => WriteMemory(_gameBase + (nuint)e.Offset, [0x83, 0xFB, 0x15])
                 ),
+                ["DK_VFXFixup1"] = (
+                    "48 8B C4 48 89 58 ?? 48 89 70 ?? 48 89 78 ?? 4C 89 70 ?? 55 48 8D 68 ?? 48 81 EC ?? ?? ?? ?? 8B 91",
+                    e => _handleTeleportAnimation = _hooks.CreateHook<HandleTeleportAnimationDelegate>(HandleTeleportAnimationHook, (long)_gameBase + e.Offset).Activate()
+                ),
+                ["DK_VFXFixup2"] = (
+                    "48 8B C4 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 78 ?? 41 56 48 83 EC ?? 33 ED 48 8D 3D",
+                    e => _startEffect = _hooks.CreateHook<StartEffectDelegate>(StartEffectHook, (long)_gameBase + e.Offset).Activate()
+                )
             };
 
             if (_extraJobs.Contains((ushort)0xA0))
@@ -557,6 +559,40 @@ namespace GenericJobs
                 jobId = 0xA0;
 
             return _sub286634.OriginalFunction(a1, jobId, a3, a4, a5);
+        }
+
+        private unsafe nint HandleTeleportAnimationHook(nint a1)
+        {
+            int moveType = *(int*)(a1 + 148);
+
+            if (moveType <= 0)
+            {
+                int spriteId = *(byte*)(a1 + 10);
+                _isUltimaTeleporting = spriteId == 65 || spriteId == 73;
+            }
+
+            var result = _handleTeleportAnimation.OriginalFunction(a1);
+            _isUltimaTeleporting = false;
+            return result;
+        }
+
+        private nint StartEffectHook(nint a1, nint a2, nint a3)
+        {
+            if (!_isUltimaTeleporting)
+            {
+                // yes, this is basically how the psp version handles 
+                // dark knight vfx
+                if (a2 == 0xB8)
+                    a2 = 0xA4;
+                else if (a2 == 0x2D)
+                    a2 = 0xA5;
+                else if (a2 == 0xDB)
+                    a2 = 0x100;
+                else if (a2 == 0xDC)
+                    a2 = 0x67;
+            }
+
+            return _startEffect.OriginalFunction(a1, a2, a3);
         }
 
         #region Standard Overrides
