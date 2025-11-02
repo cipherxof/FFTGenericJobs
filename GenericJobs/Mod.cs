@@ -43,7 +43,7 @@ namespace GenericJobs
         private byte[] _jobMenuUIData = new byte[0xB00];
         private byte[] _jobMenuPageOneData = new byte[0xB00];
         private int _jobMenuState = 0;
-        private bool _isUltimaTeleporting = false;
+        private int _teleportSpriteId = 0;
 
         // Hook objects
         private IHook<Sub363718Delegate>? _sub363718Hook;
@@ -569,22 +569,18 @@ namespace GenericJobs
 
         private unsafe nint HandleTeleportAnimationHook(nint a1)
         {
-            int moveType = *(int*)(a1 + 148);
-
-            if (moveType <= 0)
-            {
-                int spriteId = *(byte*)(a1 + 10);
-                _isUltimaTeleporting = spriteId == 65 || spriteId == 73;
-            }
-
+            int spriteId = *(byte*)(a1 + 10);
+            _teleportSpriteId = *(byte*)(a1 + 10);
             var result = _handleTeleportAnimation.OriginalFunction(a1);
-            _isUltimaTeleporting = false;
+            _teleportSpriteId = 0;
             return result;
         }
 
         private nint StartEffectHook(nint a1, nint a2, nint a3)
         {
-            if (!_isUltimaTeleporting)
+            bool isUltimaTeleporting = _teleportSpriteId == 65 || _teleportSpriteId == 73;
+
+            if (!isUltimaTeleporting)
             {
                 // yes, this is basically how the psp version handles 
                 // dark knight vfx
@@ -596,6 +592,13 @@ namespace GenericJobs
                     a2 = 0x100;
                 else if (a2 == 0xDC)
                     a2 = 0x67;
+            }
+            else
+            {
+                if (a2 == 0xB8)
+                    a2 = 0x28;
+                if (a2 == 0xDB)
+                    a2 = 0xDC;
             }
 
             return _startEffect.OriginalFunction(a1, a2, a3);
