@@ -457,6 +457,13 @@ namespace GenericJobs
             int currentIndex = *(int*)(a1 + 0x4A38);
             ushort* joblist = (ushort*)(_jobList);
 
+            // if viewing a job tree with only 1 job (monsters, guests), do nothing
+            if (_pageOffset == 0 && joblist[1] == 0xFFFF)
+            {
+                _sub12FBB8Hook!.OriginalFunction(a1, a2, a3, a4);
+                return;
+            }
+
             if (_originalJobList[0] == 0)
             {
                 for (int i = 0; i < MaxJobs; i++)
@@ -557,11 +564,13 @@ namespace GenericJobs
             }
         }
 
-        private nint Sub286634Hook(short a1, ushort jobId, int a3, nint a4, int a5)
+        private unsafe nint Sub286634Hook(short a1, ushort jobId, int a3, nint a4, int a5)
         {
+            ushort* joblist = (ushort*)(_jobList);
+
             // in order to equip dark knight reaction/support, we needed to +1 a > 19 loop
             // which ended at 0x5E
-            if (jobId == 0x5E)
+            if (joblist != null && joblist[0] != 0x5E && jobId == 0x5E)
                 jobId = 0xA0;
 
             return _sub286634.OriginalFunction(a1, jobId, a3, a4, a5);
