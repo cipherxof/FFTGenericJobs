@@ -322,8 +322,16 @@ namespace GenericJobs
 
         private byte Sub363718Hook()
         {
+            // if changing job or learning an ability while on the second page
+            // make sure to reset job menu properly
             if (_pageOffset > 0 && (_jobMenuState == 1402 || _jobMenuState == 1404))
+            {
+                ApplyTempPatches(true);
+                UpdateJobListDisplay();
+                _sub363718Hook!.OriginalFunction();
+                ApplyTempPatches(false);
                 return 0;
+            }
 
             byte result = _sub363718Hook!.OriginalFunction();
 

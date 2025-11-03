@@ -2,7 +2,7 @@
   "ModId": "ffttic.jobs.genericjobs",
   "ModName": "Dark Knight & Onion Knight (Generic)",
   "ModAuthor": "cipherxof",
-  "ModVersion": "0.0.5",
+  "ModVersion": "0.0.6",
   "ModDescription": "Adds the Dark Knight and Onion Knight as a generic job.",
   "ModDll": "GenericJobs.dll",
   "ModIcon": "Preview.png",
