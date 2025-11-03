@@ -578,7 +578,6 @@ namespace GenericJobs
 
         private unsafe nint HandleTeleportAnimationHook(nint a1)
         {
-            int spriteId = *(byte*)(a1 + 10);
             _teleportSpriteId = *(byte*)(a1 + 10);
             var result = _handleTeleportAnimation.OriginalFunction(a1);
             _teleportSpriteId = 0;
