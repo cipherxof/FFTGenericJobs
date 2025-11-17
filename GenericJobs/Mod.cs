@@ -245,7 +245,18 @@ namespace GenericJobs
                 ),
                 ["JobFlagsPatch2"] = (
                     "89 F0 89 CF",
-                    e => WriteMemory(_gameBase + (nuint)(e.Offset - 7), [0x41, 0xBF, 0x15, 0x00, 0x00, 0x00, 0x90])
+                    e => 
+                    {
+                        bool isDenuvod = Marshal.ReadByte((nint)_gameBase + (nint)(e.Offset - 7)) == 0x44;
+                        if (isDenuvod)
+                        {
+                            WriteMemory(_gameBase + (nuint)(e.Offset - 7), [0x41, 0xBF, 0x15, 0x00, 0x00, 0x00, 0x90]);
+                        }
+                        else
+                        {
+                            WriteMemory(_gameBase + (nuint)(e.Offset - 6), [0x41, 0xBF, 0x15]);
+                        }
+                    }
                 ),
                 ["JobIconPatch"] = (
                     "76 ?? 33 D2 41 B8 ?? ?? ?? ?? 48 8B CB",
