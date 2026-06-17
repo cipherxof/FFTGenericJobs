@@ -457,14 +457,14 @@ namespace GenericJobs
             _pageOffset = pageOffet;
             UpdateJobListDisplay();
 
-            *(int*)(a1 + 0x4A38) = newIndex;
+            *(int*)(a1 + 0x4A48) = newIndex;
 
             _dontReset = true;
             _sub363718Hook!.OriginalFunction();
             _dontReset = false;
 
             _sub1309C0!(a1, newIndex, 0);
-            *(int*)(a1 + 0x4A38) = newIndex;
+            *(int*)(a1 + 0x4A48) = newIndex;
             *(int*)(a2 + 4) = newIndex;
             *(byte*)(a2 + 8) = 1;
 
@@ -473,7 +473,7 @@ namespace GenericJobs
 
         private unsafe void Sub12FBB8Hook(nint a1, nint a2, int a3, int a4)
         {
-            int currentIndex = *(int*)(a1 + 0x4A38);
+            int currentIndex = *(int*)(a1 + 0x4A48);
             ushort* joblist = (ushort*)(_jobList);
 
             // if viewing a job tree with only 1 job (monsters, guests), do nothing
@@ -491,7 +491,7 @@ namespace GenericJobs
 
             _sub12FBB8Hook!.OriginalFunction(a1, a2, a3, a4);
 
-            int newIndex = *(int*)(a1 + 0x4A38);
+            int newIndex = *(int*)(a1 + 0x4A48);
 
             // Detect scrolling down: was on bottom row (13-18), now wrapped to first row (0-5)
             if (currentIndex >= 13 && currentIndex <= 18 && newIndex >= 0 && newIndex < 6)
@@ -534,7 +534,7 @@ namespace GenericJobs
 
         private unsafe void HandleJobMenuClickHook(nint a1, int a2, nint a3, nint a4)
         {
-            int selectedIndex = *(int*)(a1 + 19000);
+            int selectedIndex = *(int*)(a1 + 19016);
 
             if (_pageOffset == 1 && selectedIndex > 5 + _extraJobs.Length)
                 return;
