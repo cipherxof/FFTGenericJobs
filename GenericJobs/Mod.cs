@@ -27,6 +27,11 @@ namespace GenericJobs
         private static IStartupScanner? _startupScanner = null!;
         private static int MaxJobsPerPage = 19;
         private static int MaxJobs = 21;
+        private const int PageTwoExtraJobStart = 6;
+        private const int JobMenuSlotCount = 19;
+        private const int JobMenuSlotStride = 0x100;
+        private const int JobMenuSlotUnitOffset = 0x10;
+        private const int UiObjectVisibleOffset = 0x1A0;
 
         // Game base address
         private nuint _gameBase;
@@ -44,6 +49,8 @@ namespace GenericJobs
         private byte[] _jobMenuPageOneData = new byte[0xB00];
         private int _jobMenuState = 0;
         private int _teleportSpriteId = 0;
+        private nint _jobMenu = 0;
+        private int _jobMenuSlotRootsOffset = 0;
 
         // Hook objects
         private IHook<Sub363718Delegate>? _sub363718Hook;
@@ -85,6 +92,9 @@ namespace GenericJobs
         private delegate void Sub1309C0Delegate(nint a1, int a2, byte a3);
 
         [Function(CallingConventions.Microsoft)]
+        private delegate byte SetJobSlotVisibilityDelegate(nint a1, nint slotRoot, byte visible, byte force);
+
+        [Function(CallingConventions.Microsoft)]
         private delegate byte SubF5E3CDelegate(nint a1, nint a2, int a3, int a4);
 
         [Function(CallingConventions.Microsoft)]
@@ -113,6 +123,8 @@ namespace GenericJobs
 
         // Wrapper for original functions
         private Sub1309C0Delegate? _sub1309C0;
+        private Sub131A6CDelegate? _sub131A6C;
+        private SetJobSlotVisibilityDelegate? _setJobSlotVisibility;
         private SubF5E3CDelegate? _subF5E3C;
 
         public Mod(ModContext context)
@@ -186,6 +198,18 @@ namespace GenericJobs
                 ["Sub1309C0"] = (
                     "48 89 5C 24 ?? 57 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? ?? 48 8B D9 4C 63 CA",
                     e => _sub1309C0 = _hooks.CreateWrapper<Sub1309C0Delegate>((long)_gameBase + e.Offset, out _)
+                ),
+                ["Sub131A6C"] = (
+                    "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 48 8B F1 48 8D 99 ?? ?? ?? ?? 33 FF 83 7B ?? 06",
+                    e => _sub131A6C = _hooks.CreateWrapper<Sub131A6CDelegate>((long)_gameBase + e.Offset, out _)
+                ),
+                ["SetJobSlotVisibility"] = (
+                    "48 85 D2 0F 84 ?? ?? ?? ?? 48 8B C4 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 78 ?? 41 56 48 83 EC ?? 48 8B DA 41 0F B6 E9 45 84 C0",
+                    e => _setJobSlotVisibility = _hooks.CreateWrapper<SetJobSlotVisibilityDelegate>((long)_gameBase + e.Offset, out _)
+                ),
+                ["JobMenuSlotRootsOffset"] = (
+                    "45 33 D2 4C 8D 99 ?? ?? ?? ?? 49 8B 03 4A 89 44 D4 ?? 4D 3B D1",
+                    e => _jobMenuSlotRootsOffset = Marshal.ReadInt32((nint)(_gameBase + (nuint)e.Offset + 6))
                 ),
                 ["SubF5E3C"] = (
                     "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 41 8B D9 41 8B E8",
@@ -340,9 +364,13 @@ namespace GenericJobs
                 ApplyTempPatches(true);
                 UpdateJobListDisplay();
                 _sub363718Hook!.OriginalFunction();
+                UpdateJobSlotVisibility();
                 ApplyTempPatches(false);
                 return 0;
             }
+
+            if (!_dontReset && _pageOffset > 0)
+                UpdateJobSlotVisibility(showAll: true);
 
             byte result = _sub363718Hook!.OriginalFunction();
 
@@ -350,6 +378,7 @@ namespace GenericJobs
             {
                 _pageOffset = 0;
                 Array.Clear(_originalJobList, 0, _originalJobList.Length);
+                _jobMenu = 0;
             }
 
             return result;
@@ -400,14 +429,14 @@ namespace GenericJobs
             }
             else
             {
-                for (int i = 0; i < 6; i++)
+                for (int i = 0; i < PageTwoExtraJobStart; i++)
                 {
-                    joblist[i] = _originalJobList[13 + i];
+                    joblist[i] = _originalJobList[MaxJobsPerPage - PageTwoExtraJobStart + i];
                 }
 
-                for (int i = 6; i < MaxJobsPerPage; i++)
+                for (int i = PageTwoExtraJobStart; i < MaxJobsPerPage; i++)
                 {
-                    int extraIndex = i - 6;
+                    int extraIndex = i - PageTwoExtraJobStart;
                     if (extraIndex < _extraJobs.Length)
                     {
                         joblist[i] = _extraJobs[extraIndex];
@@ -455,6 +484,7 @@ namespace GenericJobs
         {
             ApplyTempPatches(true);
             _pageOffset = pageOffet;
+            _jobMenu = a1;
             UpdateJobListDisplay();
 
             *(int*)(a1 + 0x4A48) = newIndex;
@@ -468,11 +498,34 @@ namespace GenericJobs
             *(int*)(a2 + 4) = newIndex;
             *(byte*)(a2 + 8) = 1;
 
+            UpdateJobSlotVisibility(a1);
+
             ApplyTempPatches(false);
+        }
+
+        private int GetSecondPageEntryIndex(int column)
+        {
+            int extraJobCount = Math.Min(_extraJobs.Length, MaxJobsPerPage - PageTwoExtraJobStart);
+            if (extraJobCount <= 0)
+                return PageTwoExtraJobStart;
+
+            return PageTwoExtraJobStart + Math.Clamp(column, 0, extraJobCount - 1);
+        }
+
+        private unsafe void SetJobMenuSelection(nint a1, nint a2, int index)
+        {
+            *(int*)(a1 + 0x4A48) = index;
+            _sub1309C0!(a1, index, 0);
+            *(int*)(a1 + 0x4A48) = index;
+            *(int*)(a2 + 4) = index;
+            *(byte*)(a2 + 8) = 1;
+            _sub131A6C!(a1);
+            UpdateJobSlotVisibility(a1);
         }
 
         private unsafe void Sub12FBB8Hook(nint a1, nint a2, int a3, int a4)
         {
+            _jobMenu = a1;
             int currentIndex = *(int*)(a1 + 0x4A48);
             ushort* joblist = (ushort*)(_jobList);
 
@@ -499,7 +552,7 @@ namespace GenericJobs
                 if (_pageOffset == 0 && _extraJobs.Length > 0)
                 {
                     Marshal.Copy(IntPtr.Add(a1, 8816), _jobMenuPageOneData, 0, 0xB00);
-                    SetPageData(a1, a2, 1, newIndex);
+                    SetPageData(a1, a2, 1, GetSecondPageEntryIndex(newIndex));
                     return;
                 }
                 else if (_pageOffset == 1)
@@ -520,10 +573,36 @@ namespace GenericJobs
                 else if (_pageOffset == 0 && _extraJobs.Length > 0)
                 {
                     Marshal.Copy(IntPtr.Add(a1, 8816), _jobMenuPageOneData, 0, 0xB00);
-                    SetPageData(a1, a2, 1, newIndex);
+                    SetPageData(a1, a2, 1, GetSecondPageEntryIndex(currentIndex));
                     return;
                 }
             }
+
+            int firstInvalidIndex = PageTwoExtraJobStart + _extraJobs.Length;
+            bool currentIsExtraJob = currentIndex >= PageTwoExtraJobStart && currentIndex < firstInvalidIndex;
+
+            if (_pageOffset > 0 && currentIsExtraJob && newIndex >= 13)
+            {
+                SetPageData(a1, a2, 0, currentIndex - PageTwoExtraJobStart);
+                return;
+            }
+
+            bool currentIsTopRow = currentIndex >= 0 && currentIndex < PageTwoExtraJobStart;
+            bool newIndexIsEmptyMiddleSlot = newIndex >= firstInvalidIndex && newIndex < 13;
+            if (_pageOffset > 0 && currentIsTopRow && newIndexIsEmptyMiddleSlot)
+            {
+                SetJobMenuSelection(a1, a2, firstInvalidIndex - 1);
+                return;
+            }
+
+            if (_pageOffset > 0 && newIndex >= firstInvalidIndex)
+            {
+                SetJobMenuSelection(a1, a2, currentIndex);
+                return;
+            }
+
+            if (_pageOffset > 0)
+                UpdateJobSlotVisibility(a1);
         }
 
         private nint UpdateJobListHook(nint jobList, int a2, nint a3)
@@ -536,7 +615,7 @@ namespace GenericJobs
         {
             int selectedIndex = *(int*)(a1 + 19016);
 
-            if (_pageOffset == 1 && selectedIndex > 5 + _extraJobs.Length)
+            if (_pageOffset == 1 && selectedIndex >= PageTwoExtraJobStart + _extraJobs.Length)
                 return;
 
             _handleJobMenuClick?.OriginalFunction(a1, a2, a3, a4);
@@ -556,10 +635,40 @@ namespace GenericJobs
                     _pageOffset = 0;
                     UpdateJobListDisplay();
                     _sub363718Hook!.OriginalFunction();
+                    UpdateJobSlotVisibility(a1);
                 }
             }
 
             _handleJobMenuState?.OriginalFunction(a1, a2, a3, a4, state);
+        }
+
+        private unsafe void UpdateJobSlotVisibility(bool showAll = false)
+        {
+            if (_jobMenu == 0)
+                return;
+
+            UpdateJobSlotVisibility(_jobMenu, showAll);
+        }
+
+        private unsafe void UpdateJobSlotVisibility(nint jobMenu, bool showAll = false)
+        {
+            if (_setJobSlotVisibility == null || _jobMenuSlotRootsOffset == 0)
+                return;
+
+            int extraJobEnd = Math.Min(PageTwoExtraJobStart + _extraJobs.Length, MaxJobsPerPage);
+
+            for (int i = 0; i < JobMenuSlotCount; i++)
+            {
+                bool visible = showAll || _pageOffset == 0 || i < extraJobEnd;
+                nint slotData = jobMenu + _jobMenuSlotRootsOffset + i * JobMenuSlotStride;
+                nint unitRoot = *(nint*)(slotData + JobMenuSlotUnitOffset);
+
+                if (unitRoot != 0)
+                {
+                    _setJobSlotVisibility(jobMenu, unitRoot, visible ? (byte)1 : (byte)0, 1);
+                    *(byte*)(unitRoot + UiObjectVisibleOffset) = visible ? (byte)1 : (byte)0;
+                }
+            }
         }
 
         private unsafe char UpdateLevelRequirementsPopupHook(nint a1)
