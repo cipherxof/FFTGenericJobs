@@ -241,7 +241,7 @@ namespace GenericJobs
                 ),
                 ["JobFlagsPatch1"] = (
                     "48 8B 6C 24 ?? 89 D8 48 8B 5C 24 ?? 48 8B 74 24 ?? 48 83 C4 ?? 41 5F 41 5E 41 5D",
-                    e => WriteMemory(_gameBase + (nuint)e.Offset - 3, [0x90, 0x90, 0x90])
+                    e => WriteMemory(_gameBase + (nuint)e.Offset - 2, [0x90, 0x90, 0x90])
                 ),
                 ["JobFlagsPatch2"] = (
                     "89 F0 89 CF",
