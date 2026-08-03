@@ -56,6 +56,7 @@ namespace GenericJobs
         private IHook<Sub363718Delegate>? _sub363718Hook;
         private IHook<Sub12FBB8Delegate>? _sub12FBB8Hook;
         private IHook<UpdateJobListDelegate>? _updateJobListHook;
+        private IHook<PopulateJobMenuSlotDelegate>? _populateJobMenuSlot;
         private IHook<UpdateLevelRequirementsPopupDelegate>? _updateLevelRequirementsPopup;
         private IHook<SetJobRequirementNameDelegate>? _setJobRequirementName;
         private IHook<HandleJobMenuClickDelegate>? _handleJobMenuClick;
@@ -84,6 +85,9 @@ namespace GenericJobs
 
         [Function(CallingConventions.Microsoft)]
         private delegate nint UpdateJobListDelegate(nint jobList, int a2, nint a3);
+
+        [Function(CallingConventions.Microsoft)]
+        private delegate void PopulateJobMenuSlotDelegate(nint a1, nint jobData, int index);
 
         [Function(CallingConventions.Microsoft)]
         private delegate nint Sub3CEE14Delegate(nint a1, uint a2);
@@ -226,6 +230,10 @@ namespace GenericJobs
                 ["UpdateJobListHook"] = (
                     "48 89 E0 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 48 ?? 57 41 54",
                     e => _updateJobListHook = _hooks.CreateHook<UpdateJobListDelegate>(UpdateJobListHook, (long)_gameBase + e.Offset).Activate()
+                ),
+                ["PopulateJobMenuSlot"] = (
+                    "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 41 54 41 55 41 56 41 57 48 83 EC ?? 49 63 F8 4C 8B EA 48 8B D9",
+                    e => _populateJobMenuSlot = _hooks.CreateHook<PopulateJobMenuSlotDelegate>(PopulateJobMenuSlotHook, (long)_gameBase + e.Offset).Activate()
                 ),
                 ["UpdateLevelRequirementsPopup"] = (
                     "48 8B C4 48 89 58 ?? 48 89 70 ?? 48 89 78 ?? 55 41 54 41 55 41 56 41 57 48 8D A8 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 85 ?? ?? ?? ?? 48 63 81",
@@ -609,6 +617,17 @@ namespace GenericJobs
         {
             _jobList = jobList;
             return _updateJobListHook!.OriginalFunction(jobList, a2, a3);
+        }
+
+        private unsafe void PopulateJobMenuSlotHook(nint a1, nint jobData, int index)
+        {
+            int extraJobEnd = Math.Min(PageTwoExtraJobStart + _extraJobs.Length, MaxJobsPerPage);
+            bool isExtraJob = _pageOffset > 0 && index >= PageTwoExtraJobStart && index < extraJobEnd;
+
+            if (isExtraJob && *(int*)(jobData + 0x44) < 1)
+                *(int*)(jobData + 0x44) = 1;
+
+            _populateJobMenuSlot!.OriginalFunction(a1, jobData, index);
         }
 
         private unsafe void HandleJobMenuClickHook(nint a1, int a2, nint a3, nint a4)
