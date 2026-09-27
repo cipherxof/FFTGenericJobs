@@ -65,13 +65,7 @@ namespace GenericJobs
         private IHook<StartEffectDelegate>? _startEffect;
         private IHook<HandleTeleportAnimationDelegate>? _handleTeleportAnimation;
 
-
-        // Patched addresses
-        private nuint _jobPatch1 = 0;
-        private nuint _jobPatch2 = 0;
-        private nuint _jobPatch3 = 0;
-        private nuint _jobPatch4 = 0;
-        private nuint _jobPatch5 = 0;
+        private readonly List<(nuint address, byte[] original)> _tempPatches = new();
 
         // Offsets
         private long _jobList = 0;
@@ -216,7 +210,7 @@ namespace GenericJobs
                     e => _jobMenuSlotRootsOffset = Marshal.ReadInt32((nint)(_gameBase + (nuint)e.Offset + 6))
                 ),
                 ["SubF5E3C"] = (
-                    "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 41 8B D9 41 8B E8",
+                    "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC ?? 41 8B D9 41 8B E8 48 8B FA 48 8B F1 E8 ?? ?? ?? ?? 84 C0 75 ?? BA 00 80 00 00",
                     e => _subF5E3C = _hooks.CreateWrapper<SubF5E3CDelegate>((long)_gameBase + e.Offset, out _)
                 ),
                 ["Sub363718Hook"] = (
@@ -224,11 +218,11 @@ namespace GenericJobs
                     e => _sub363718Hook = _hooks.CreateHook<Sub363718Delegate>(Sub363718Hook, (long)_gameBase + e.Offset).Activate()
                 ),
                 ["Sub12FBB8Hook"] = (
-                    "48 8B C4 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 78 ?? 41 54 41 56 41 57 48 83 EC ?? 45 8B F9",
+                    "48 8B C4 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 78 ?? 41 54 41 56 41 57 48 83 EC ?? 45 8B F9 45 8B E0",
                     e => _sub12FBB8Hook = _hooks.CreateHook<Sub12FBB8Delegate>(Sub12FBB8Hook, (long)_gameBase + e.Offset).Activate()
                 ),
                 ["UpdateJobListHook"] = (
-                    "48 89 E0 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 48 ?? 57 41 54",
+                    "48 8B C4 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 48 ?? 57 41 54 41 55 41 56 41 57 48 83 EC ?? 45 0F B6 48 02",
                     e => _updateJobListHook = _hooks.CreateHook<UpdateJobListDelegate>(UpdateJobListHook, (long)_gameBase + e.Offset).Activate()
                 ),
                 ["PopulateJobMenuSlot"] = (
@@ -253,42 +247,33 @@ namespace GenericJobs
                 ),
                 ["JobPatch1"] = (
                     "89 83 ?? ?? ?? ?? 45 33 C0 8B D7",
-                    e => _jobPatch1 = _gameBase + (nuint)e.Offset
+                    e => AddTempPatch(_gameBase + (nuint)e.Offset, 6)
                 ),
                 ["JobPatch2"] = (
                     "66 89 0E EB ?? 0F B7 CB",
-                    e => _jobPatch2 = _gameBase + (nuint)e.Offset
+                    e => AddTempPatch(_gameBase + (nuint)e.Offset, 3)
                 ),
                 ["JobPatch3"] = (
                     "83 8F ?? ?? ?? ?? ?? 4C 8D 5C 24",
-                    e => _jobPatch3 = _gameBase + (nuint)e.Offset
+                    e => AddTempPatch(_gameBase + (nuint)e.Offset, 7)
                 ),
                 ["JobPatch4"] = (
-                    "66 89 1E 44 01 ED",
-                    e => _jobPatch4 = _gameBase + (nuint)e.Offset
+                    "66 89 1E 41 03 ED",
+                    e => AddTempPatch(_gameBase + (nuint)e.Offset, 3)
                 ),
                 ["JobPatch5"] = (
-                    "75 ?? 41 09 C9 66 45 89 0F",
-                    e => _jobPatch5 = _gameBase + (nuint)e.Offset + 5
+                    "75 ?? 44 0B C9 66 45 89 0F",
+                    e => AddTempPatch(_gameBase + (nuint)e.Offset + 5, 4)
                 ),
+                // clears the Dark Knight unlock bit unless the kill count / mastery requirements are met
                 ["JobFlagsPatch1"] = (
-                    "48 8B 6C 24 ?? 89 D8 48 8B 5C 24 ?? 48 8B 74 24 ?? 48 83 C4 ?? 41 5F 41 5E 41 5D",
-                    e => WriteMemory(_gameBase + (nuint)e.Offset - 0xD, [0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90])
+                    "83 E3 F7 48 8B 6C 24 ?? 8B C3 48 8B 5C 24",
+                    e => WriteMemory(_gameBase + (nuint)e.Offset, [0x90, 0x90, 0x90])
                 ),
+                // check unlock requirements for 21 jobs instead of 19
                 ["JobFlagsPatch2"] = (
-                    "89 F0 89 CF",
-                    e => 
-                    {
-                        bool isDenuvod = Marshal.ReadByte((nint)_gameBase + (nint)(e.Offset - 7)) == 0x44;
-                        if (isDenuvod)
-                        {
-                            WriteMemory(_gameBase + (nuint)(e.Offset - 7), [0x41, 0xBF, 0x15, 0x00, 0x00, 0x00, 0x90]);
-                        }
-                        else
-                        {
-                            WriteMemory(_gameBase + (nuint)(e.Offset - 6), [0x41, 0xBF, 0x15]);
-                        }
-                    }
+                    "41 BF 13 00 00 00 8B C6 8B F9",
+                    e => WriteMemory(_gameBase + (nuint)e.Offset + 2, [0x15])
                 ),
                 ["JobIconPatch"] = (
                     "76 ?? 33 D2 41 B8 ?? ?? ?? ?? 48 8B CB",
@@ -468,23 +453,21 @@ namespace GenericJobs
             }
         }
 
+        private void AddTempPatch(nuint address, int length)
+        {
+            var original = new byte[length];
+            Marshal.Copy((nint)address, original, 0, length);
+            _tempPatches.Add((address, original));
+        }
+
         private unsafe void ApplyTempPatches(bool disable)
         {
-            if (disable)
+            foreach (var (address, original) in _tempPatches)
             {
-                WriteMemory(_jobPatch1, [0x90, 0x90, 0x90, 0x90, 0x90, 0x90]);
-                WriteMemory(_jobPatch2, [0x90, 0x90, 0x90]);
-                WriteMemory(_jobPatch3, [0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90]);
-                WriteMemory(_jobPatch4, [0x90, 0x90, 0x90]);
-                WriteMemory(_jobPatch5, [0x90, 0x90, 0x90, 0x90]);
-            }
-            else
-            {
-                WriteMemory(_jobPatch1, [0x89, 0x83, 0x38, 0x4A, 0x00, 0x00]);
-                WriteMemory(_jobPatch2, [0x66, 0x89, 0x0E]);
-                WriteMemory(_jobPatch3, [0x83, 0x8F, 0x38, 0x4A, 0x00, 0x00, 0xFF]);
-                WriteMemory(_jobPatch4, [0x66, 0x89, 0x1E]);
-                WriteMemory(_jobPatch5, [0x66, 0x45, 0x89, 0x0F]);
+                if (disable)
+                    WriteMemory(address, Enumerable.Repeat((byte)0x90, original.Length).ToArray());
+                else
+                    WriteMemory(address, original);
             }
         }
 
