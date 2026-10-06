@@ -16,7 +16,7 @@ namespace GenericJobs
     /// <summary>
     /// Job selection mod that adds vertical paging for hidden jobs (Dark Knight)
     /// </summary>
-    public class Mod : ModBase
+    public partial class Mod : ModBase
     {
         private readonly IModLoader _modLoader;
         private readonly IReloadedHooks? _hooks;
@@ -215,7 +215,11 @@ namespace GenericJobs
                 ),
                 ["Sub363718Hook"] = (
                     "48 8B C4 48 89 58 ?? 48 89 70 ?? 48 89 78 ?? 55 41 54 41 55 41 56 41 57 48 8D A8 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 85 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 4C 8D 25",
-                    e => _sub363718Hook = _hooks.CreateHook<Sub363718Delegate>(Sub363718Hook, (long)_gameBase + e.Offset).Activate()
+                    e =>
+                    {
+                        ApplyPatches("Sub363718Hook", e.Offset, JobListBuilderTreePatches);
+                        _sub363718Hook = _hooks.CreateHook<Sub363718Delegate>(Sub363718Hook, (long)_gameBase + e.Offset).Activate();
+                    }
                 ),
                 ["Sub12FBB8Hook"] = (
                     "48 8B C4 48 89 58 ?? 48 89 68 ?? 48 89 70 ?? 48 89 78 ?? 41 54 41 56 41 57 48 83 EC ?? 45 8B F9 45 8B E0",
@@ -317,6 +321,8 @@ namespace GenericJobs
             {
                 patterns = patterns.Concat(darkKnightPatterns).ToDictionary(x => x.Key, x => x.Value);
             }
+
+            patterns = patterns.Concat(JobTreePatterns()).ToDictionary(x => x.Key, x => x.Value);
 
             _logger.WriteLine($"[{_modConfig.ModId}] Scanning for {patterns.Count} patterns...");
 
@@ -637,7 +643,7 @@ namespace GenericJobs
                     _pageOffset = 0;
                     UpdateJobListDisplay();
                     _sub363718Hook!.OriginalFunction();
-                    UpdateJobSlotVisibility(a1);
+                    UpdateJobSlotVisibility(ui);   // the job menu (screen + 0x78), not the screen
                 }
             }
 
