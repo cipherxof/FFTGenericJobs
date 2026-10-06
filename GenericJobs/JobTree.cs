@@ -292,9 +292,15 @@ namespace GenericJobs
             _ => -1,
         };
 
+        // The list builder hands the tree up to 21 jobs (JobListBuilderTreePatches) only so Dark Knight and Onion Knight
+        // reach it; the menu itself keeps 19 slots. A job the tree has no node for past the vanilla 19 (one another mod
+        // adds to the list) is skipped instead of landing on another job's node.
         private unsafe void PopulateJobTreeSlotHook(nint tree, nint jobData, int index)
         {
             int treeIndex = JobTreeIndex(*(int*)(jobData + TreeJobDataJobOffset));
+            if (treeIndex < 0 && index >= JobMenuSlotCount)
+                return;
+
             _populateJobTreeSlot!.OriginalFunction(tree, jobData, treeIndex >= 0 ? treeIndex : index);
         }
 
